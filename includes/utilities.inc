@@ -44,6 +44,8 @@ function islandora_zip_download_mimetypes_in_use($facet_prefix = FALSE) {
   $qp->solrParams['facet'] = 'true';
   $qp->solrParams['facet.field'] = $facet_field;
   $qp->solrParams['facet.mincount'] = 0;
+  $qp->solrParams['facet.limit'] = -1;
+  $qp->solrParams['fq'] = '';
   if ($facet_prefix) {
     $qp->solrParams['facet.prefix'] = $facet_prefix;
   }
