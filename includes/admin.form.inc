@@ -24,6 +24,24 @@ function islandora_zip_download_admin_form($form, $form_state) {
   $form['config']['general_configuration'] = array(
     '#type' => 'fieldset',
     '#title' => t('General Configuration'),
+    'islandora_zip_download_solr_member_of_field' => array(
+      '#type' => 'textfield',
+      '#title' => t( 'isMemberOf Solr field'),
+      '#required' => TRUE,
+      '#default_value' => variable_get('islandora_zip_download_solr_member_of_field', 'RELS_EXT_isMemberOf_uri_ms'),
+    ),
+    'islandora_zip_download_solr_member_of_collection_field' => array(
+      '#type' => 'textfield',
+      '#title' => t( 'isMemberOfCollection Solr field'),
+      '#required' => TRUE,
+      '#default_value' => variable_get( 'islandora_zip_download_solr_member_of_collection_field', 'RELS_EXT_isMemberOfCollection_uri_ms'),
+    ),
+    'islandora_zip_download_compound_object_relationship' => array(
+      '#type' => 'textfield',
+      '#title' => t('Compound Object relationship value'),
+      '#required' => TRUE,
+      '#default_value' => variable_get('islandora_zip_download_compound_object_relationship', 'isConstituentOf'),
+    ),
     'islandora_zip_download_mimetype_solr_field' => array(
       '#type' => 'textfield',
       '#title' => t('MIME type Solr field'),
@@ -58,6 +76,12 @@ function islandora_zip_download_admin_form($form, $form_state) {
       '#title' => t('Checksums'),
       '#default_value' => variable_get('islandora_zip_download_checksums', array('md5' => 'md5')),
       '#description' => t('Checksums to run on downloads.'),
+    ),
+    'islandora_zip_download_names_with_pids' => array(
+      '#type' => 'checkbox',
+      '#title' => t('Include PIDs in folder names'),
+      '#description' => t('Include Fedora PIDs in folder names inside the ZIP file, in addition to the object labels (enable if name clashes are possible in your repository)'),
+      '#default_value' => variable_get('islandora_zip_download_names_with_pids', FALSE),
     ),
   );
   $size_defaults = variable_get('islandora_zip_download_size_limits', array(

@@ -367,9 +367,9 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
     $qp = new IslandoraSolrQueryProcessor();
     $qp->buildQuery('*:*');
     $fields = array(
-      variable_get('islandora_solr_member_of_field', 'RELS_EXT_isMemberOf_uri_ms'),
-      variable_get('islandora_solr_member_of_collection_field', 'RELS_EXT_isMemberOfCollection_uri_ms'),
-      variable_get('islandora_compound_object_relationship', 'isConstituentOf'),
+      variable_get('islandora_zip_download_solr_member_of_field', 'RELS_EXT_isMemberOf_uri_ms'),
+      variable_get('islandora_zip_download_solr_member_of_collection_field', 'RELS_EXT_isMemberOfCollection_uri_ms'),
+      variable_get('islandora_zip_download_compound_object_relationship', 'isConstituentOf'),
     );
     $map_field_in = function($field) {
       return format_string('!field:"info:fedora/!pid"', array(
@@ -378,7 +378,7 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
     };
     $qp->solrParams['fq'] = array(
       format_string(implode(' OR ', array_map($map_field_in, $fields)), array(
-        '!pid' => $this->current(),
+        '!pid' => urldecode($this->current()),
       )),
     );
     return $qp;
@@ -392,29 +392,56 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
    *   PID.
    */
   protected function getCurrentNameComponents() {
+
+    $include_pids = variable_get('islandora_zip_download_names_with_pids', FALSE);
+
     $components = $this->parent === NULL ?
         array() :
         $this->parent->getCurrentNameComponents();
 
     $object = islandora_object_load($this->current());
 
-    if ($this->parent === NULL && !in_array('islandora:collectionCModel', $object->models)) {
-      module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
+    module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
+
+    if ((!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf')) && (!in_array($this->current(), $this->start))) {
+      // for non-compound objects, look up the parents, unless the object is part of the "start" objects
       $parents = islandora_basic_collection_get_parent_pids($object);
-      $parent_id = reset($parents);
-      if ($parent_id && $parent = islandora_object_load($parent_id)) {
+    }
+    else {
+      // look up the parents of compound objects
+      $compound_parents = $object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf');
+      $map_results = function ($o) {
+        return $o['object']['value'];
+      };
+      $compound_parents = array_map($map_results, $compound_parents);
+      $parents = array_unique(array_filter($compound_parents));
+    }
+
+    $parent_id = reset($parents);
+    if ($parent_id && $parent = islandora_object_load($parent_id)) {
+      if ($include_pids) {
         $components[] = t('!label (!pid)', array(
-          '!label' => str_replace('/', '__', $parent->label),
-          '!pid' => $parent->id,
+          '!label' => str_replace('/', '_', $parent->label),
+          '!pid' => str_replace(':', '_', $parent->id),
         ));
+      } else {
+        $components[] = str_replace('/', '_', $parent->label);
       }
     }
 
-    $components[] = t('!label (!pid)', array(
-      '!label' => $object->label,
-      '!pid' => $object->id,
-    ));
-
+    if (!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf')) {
+      // we skip the compound constituents in order to put the files directly in the directory of the compound
+      // name clashes should not occur since we control for this on ingest and we exclude "administrative" datastreams
+      if ($include_pids) {
+        $components[] = t('!label (!pid)', array(
+          '!label' => str_replace('/', '_', $object->label),
+          '!pid' => str_replace(':', '_', $object->id),
+        ));
+      }
+      else {
+        $components[] = str_replace('/', '_', $object->label);
+      }
+    }
     return $components;
   }
 
