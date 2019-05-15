@@ -38,9 +38,9 @@ function islandora_zip_download_admin_form($form, $form_state) {
     ),
     'islandora_zip_download_compound_object_relationship' => array(
       '#type' => 'textfield',
-      '#title' => t('Compound Object relationship value'),
+      '#title' => t('Compound Object relationship Solr field'),
       '#required' => TRUE,
-      '#default_value' => variable_get('islandora_zip_download_compound_object_relationship', 'isConstituentOf'),
+      '#default_value' => variable_get('islandora_zip_download_compound_object_relationship', 'RELS_EXT_isConstituentOf_uri_ms'),
     ),
     'islandora_zip_download_mimetype_solr_field' => array(
       '#type' => 'textfield',
