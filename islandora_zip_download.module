@@ -74,11 +74,12 @@ function islandora_zip_download_generate_manifest($pids, $style, $form_state) {
       $mime_types = $form_state['complete form']['islandora_bookmark_export']['fieldset']['file_types']['#options'];
     }
   }
+
   $pids_to_filter = array_map('trim', array_filter(explode(',', variable_get('islandora_zip_download_pids_to_exclude', ''))));
   $dsids_to_filter = array_map('trim', array_filter(explode(',', variable_get('islandora_zip_download_dsids_to_exclude', ''))));
   $mimes_to_filter = array_map('trim', array_filter(explode(',', variable_get('islandora_zip_download_mimes_to_exclude', ''))));
   $pids_to_export = array_diff($pids, $pids_to_filter);
-  $mimes_to_export = array_diff($mime_types, $mimes_to_filter);
+  $mimes_to_export = array_keys(array_diff($mime_types, $mimes_to_filter));
   if (empty($pids_to_export)) {
     form_set_error('bookmarks][fieldset', t('No PIDs to export.'));
   }
@@ -101,14 +102,14 @@ function islandora_zip_download_generate_manifest($pids, $style, $form_state) {
       'filtered' => $pids_to_export,
     ),
   ));
-  drupal_set_message(t('The ZIP generation job has been queued. An e-mail will be sent when complete.'));
+  drupal_set_message(t('The ZIP generation job has been queued. You will receive an email once the ZIP file is ready for download (please also check your spam box).'));
 }
 
 /**
  * Implements hook_form_FORMID_alter().
  */
 function islandora_zip_download_form_islandora_bookmark_results_form_alter(&$form, &$form_state) {
-  if (user_access('export islandora bookmarks')) {
+  if (user_access('export islandora bookmarks') && !empty($form['bookmarks']['fieldset']['table']['#options'])) {
     islandora_zip_download_file_type_export_element($form, 'islandora_bookmark_export');
   }
 }
@@ -117,7 +118,7 @@ function islandora_zip_download_form_islandora_bookmark_results_form_alter(&$for
  * Implements hook_form_FORMID_alter().
  */
 function islandora_zip_download_form_islandora_bookmark_detailed_form_alter(&$form, &$form_state) {
-  if (user_access('export islandora bookmarks')) {
+  if (user_access('export islandora bookmarks') && !empty($form['bookmarks']['fieldset']['table']['#options'])) {
     islandora_zip_download_file_type_export_element($form, 'bookmarks');
   }
 }
@@ -138,7 +139,7 @@ function islandora_zip_download_file_type_export_element(&$form, $parent_element
     $form[$parent_element]['fieldset']['file_types'] = array(
       '#type' => 'select',
       '#title' => t('File types'),
-      '#description' => t('Select the types of MIMEs to be included in the ZIP. If none are selected all types will be included.'),
+      '#description' => t('Select the file types to be included in the ZIP. If none are selected all types will be included.'),
       '#multiple' => TRUE,
       '#options' => $options,
       // Using 4.1 to place this directly under the existing Bookmark select.

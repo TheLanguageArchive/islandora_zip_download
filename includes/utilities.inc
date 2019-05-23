@@ -14,6 +14,9 @@
 function islandora_zip_download_mimetypes_to_export() {
   module_load_include('inc', 'islandora_zip_download_taxonomy', 'includes/utilities');
   $mimes = islandora_zip_download_mimetypes_in_use();
+  $mimes_to_filter = array_map('trim', array_filter(explode(',', variable_get('islandora_zip_download_mimes_to_exclude', ''))));
+  // do not list mimes that are configured to be excluded
+  $mimes = array_diff($mimes, $mimes_to_filter);
   if ($mimes) {
     // Grab any human-readable variables and replace them as the values.
     $human_readable = islandora_zip_download_taxonomy_human_readable_mimetypes();

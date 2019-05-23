@@ -9,6 +9,9 @@
  */
 function islandora_zip_download_uninstall() {
   $variables = array(
+    'islandora_zip_download_solr_member_of_field',
+    'islandora_zip_download_solr_member_of_collection_field',
+    'islandora_zip_download_compound_object_relationship',
     'islandora_zip_download_mimetype_solr_field',
     'islandora_zip_download_pids_to_exclude',
     'islandora_zip_download_dsids_to_exclude',
@@ -16,6 +19,7 @@ function islandora_zip_download_uninstall() {
     'islandora_zip_download_ttl',
     'islandora_zip_download_size_limits',
     'islandora_zip_download_checksums',
+    'islandora_zip_download_names_with_pids',
   );
   array_walk($variables, 'variable_del');
 }

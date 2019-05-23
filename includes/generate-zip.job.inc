@@ -95,6 +95,7 @@ EOHT;
     return $num * (1 << $base_limits['scale']);
   };
   $size_limits = array_map($map_to_gib, $base_limits);
+
   $size_constrained = FALSE;
 
   $check_stats = function ($size_to_add) use (&$stats, $size_limits) {
@@ -401,47 +402,40 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
 
     $object = islandora_object_load($this->current());
 
-    module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
-
-    if ((!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf')) && (!in_array($this->current(), $this->start))) {
+    if (!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf') && !in_array($this->current(), $this->start)) {
       // for objects other than compound children, look up the parents, unless the object is part of the "start" objects, as we do not need parents
       // higher than the selected objects themselves
-      $parents = islandora_basic_collection_get_parent_pids($object);
+      $path_pids = islandora_basic_collection_get_parent_pids($object);
     }
     else {
       // look up the parents of compound children
-      $compound_parents = $object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf');
+      $constituent_parents = $object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf');
       $map_results = function ($o) {
         return $o['object']['value'];
       };
-      $compound_parents = array_map($map_results, $compound_parents);
-      $parents = array_unique(array_filter($compound_parents));
+      $constituent_parents = array_map($map_results, $constituent_parents);
+      $path_pids = array_unique(array_filter($constituent_parents));
     }
 
-    $parent_id = reset($parents);
-    if ($parent_id && $parent = islandora_object_load($parent_id)) {
-      if ($include_pids) {
-        $components[] = t('!label (!pid)', array(
-          '!label' => str_replace('/', '_', $parent->label),
-          '!pid' => str_replace(':', '_', $parent->id),
-        ));
-      } else {
-        $components[] = str_replace('/', '_', $parent->label);
-      }
+    $path_pids = reset($path_pids); // in case there are multiple parents we only need one for constructing a path
+
+    if ((!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf') && in_array('islandora:compoundCModel', $object->models)) OR in_array('islandora:collectionCModel', $object->models)) {
+      // for compounds and collections add the object itself. In principle compound objects should not have the isConstituentOf relation, but theoretically that might be possible.
+      $path_pids[] = $object->id;
+      // remove duplicate pids in case the object was already added as a parent
+      $path_pids = array_unique($path_pids);
     }
 
-    if (!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf') && !in_array('islandora:compoundCModel', $object->models)) {
-      // we only add the object itself in case of a collection, skipping compounds and their constituents. Compound is already added as a parent,
-      // files of constituents will be placed directly in the compound parent directory. Name clashes should not occur since we control for this
-      // on ingest and we exclude "administrative" datastreams.
-      if ($include_pids) {
-        $components[] = t('!label (!pid)', array(
-          '!label' => str_replace('/', '_', $object->label),
-          '!pid' => str_replace(':', '_', $object->id),
-        ));
-      }
-      else {
-        $components[] = str_replace('/', '_', $object->label);
+    if ($path_pids) {
+      foreach ($path_pids as $pid) {
+        // create path components from object label and (optionally) pid
+        $object = islandora_object_load($pid);
+        if ($include_pids) {
+          $components [] = t ('!label (!pid)', array ('!label' => str_replace ('/', '_', $object->label),
+          '!pid' => str_replace (':', '_', $object->id),));
+        } else {
+          $components [] = str_replace ('/', '_', $object->label);
+        }
       }
     }
 
