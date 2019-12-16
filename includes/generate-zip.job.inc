@@ -386,47 +386,19 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
   }
 
   /**
-   * Build array of path components to the current object.
+   * Return path components to the current object.
    *
    * @return array
    *   An array of path components, each consisting of the object's label and
-   *   PID.
+   *   (optionally) PID.
    */
   protected function getCurrentNameComponents() {
 
     $include_pids = variable_get('islandora_zip_download_names_with_pids', FALSE);
 
-    $components = $this->parent === NULL ?
-        array() :
-        $this->parent->getCurrentNameComponents();
-
-    $object = islandora_object_load($this->current());
-
-    if (!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf') && !in_array($this->current(), $this->start)) {
-      // for objects other than compound children, look up the parents, unless the object is part of the "start" objects, as we do not need parents
-      // higher than the selected objects themselves
-      $path_pids = islandora_basic_collection_get_parent_pids($object);
-    }
-    else {
-      // look up the parents of compound children
-      $constituent_parents = $object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf');
-      $map_results = function ($o) {
-        return $o['object']['value'];
-      };
-      $constituent_parents = array_map($map_results, $constituent_parents);
-      $path_pids = array_unique(array_filter($constituent_parents));
-    }
-
-    $path_pids = reset($path_pids); // in case there are multiple parents we only need one for constructing a path
-
-    if ((!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf') && in_array('islandora:compoundCModel', $object->models)) OR in_array('islandora:collectionCModel', $object->models)) {
-      // for compounds and collections add the object itself. In principle compound objects should not have the isConstituentOf relation, but theoretically that might be possible.
-      $path_pids[] = $object->id;
-      // remove duplicate pids in case the object was already added as a parent
-      $path_pids = array_unique($path_pids);
-    }
-
+    $path_pids = $this->getPathPids();
     if ($path_pids) {
+      $path_pids = array_unique($path_pids);
       foreach ($path_pids as $pid) {
         // create path components from object label and (optionally) pid
         $object = islandora_object_load($pid);
@@ -438,8 +410,50 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
         }
       }
     }
-
     return $components;
+  }
+
+  /**
+   * Build array of path pids to the current object.
+   *
+   * @return array
+   *   An array of path pids
+   */
+
+  protected function getPathPids() {
+
+    $path_pids = $this->parent === NULL ? array() : $this->parent->getPathPids();
+
+    $object = islandora_object_load($this->current());
+
+    if (!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf') && !in_array($this->current(), $this->start)) {
+      // for objects other than compound children, look up the parents, unless the object is part of the "start" objects, as we do not need parents
+      // higher than the selected objects themselves
+      $pid = islandora_basic_collection_get_parent_pids($object);
+    }
+    else {
+      // look up the parents of compound children
+      $constituent_parents = $object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf');
+      if ($constituent_parents) {
+        $map_results = function ($o) {
+          return $o['object']['value'];
+          };
+      $constituent_parents = array_map($map_results, $constituent_parents);
+      $pid = array_unique($constituent_parents);
+      }
+    }
+
+    $pid = array_slice($pid, 0, 1); // in case there are multiple parents we only need one for constructing a path
+    if ((!$object->relationships->get(FEDORA_RELS_EXT_URI, 'isConstituentOf') && in_array('islandora:compoundCModel', $object->models)) OR in_array('islandora:collectionCModel', $object->models)) {
+    // for compounds and collections add the object itself. In principle compound objects should not have the isConstituentOf relation, but theoretically that might be possible.
+    $pid[] = $object->id;
+    // remove duplicate pids in case the object was already added as a parent
+    }
+
+    if ($pid) {
+      $path_pids [] = $pid[0];
+      return $path_pids;
+    }
   }
 
   /**
