@@ -92,7 +92,7 @@ EOHT;
     'split_executable' => 'split',
   ));
   $map_to_gib = function ($num) use ($base_limits) {
-    return $num * (1 << $base_limits['scale']);
+    return (is_numeric($num) ? ($num * (1 << $base_limits['scale'])) : $num);
   };
   $size_limits = array_map($map_to_gib, $base_limits);
 
@@ -109,19 +109,17 @@ EOHT;
   $tmp_destination = $directory . '/tmp';
   file_prepare_directory($tmp_destination, FILE_CREATE_DIRECTORY);
 
-  $write_file_to_tmp = function($actual_file, $actual_name) use ($tmp_files, $tmp_destination) {
+  $write_file_to_tmp = function($actual_file, $actual_name) use (&$tmp_files, $tmp_destination) {
 
-    $actual_path = drupal_realpath($actual_file);
-    copy($actual_path, $tmp_destination);
-
+    $copy_path   = file_unmanaged_copy($actual_file, $tmp_destination);
     $tmp_files[] = [
 
-      'path' => $actual_path,
+      'path' => drupal_realpath($copy_path),
       'name' => $actual_name,
     ];
   };
 
-  $write_tmp_to_zip = function() use ($tmp_files, $tmp_destination, $zip, $zip_file_path, $stats, $check_stats) {
+  $write_tmp_to_zip = function() use (&$tmp_files, $zip, $zip_file_path, &$stats, $check_stats) {
 
     $zip->open($zip_file_path, ZipArchive::CREATE);
 
@@ -136,12 +134,11 @@ EOHT;
       $stats['size']['source'] += $tmp_file_size;
     }
 
+    $zip->close();
     $stats['size']['compressed'] = filesize($zip_file_path);
   };
 
-  $cleanup_tmp_zip = function() use ($zip, $tmp_files, $tmp_destination) {
-
-    $zip->close();
+  $cleanup_tmp_zip = function() use (&$tmp_files, $tmp_destination) {
 
     foreach ($tmp_files as $tmp_file) {
       drupal_unlink($tmp_file['path']);
@@ -506,13 +503,9 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
           };
       $constituent_parents = array_map($map_results, $constituent_parents);
       $pid = array_unique($constituent_parents);
+      } else {
+        $pid = [];
       }
-    }
-
-    try {
-      throw new \Exception('rtest');
-    } catch (\Exception $e) {
-      // file_put_contents('/app/flat/log/zip.log', file_get_contents('/app/flat/log/zip.log') . "\n\n" . var_export($e->getTraceAsString(), true));
     }
 
     $pid = array_slice($pid, 0, 1); // in case there are multiple parents we only need one for constructing a path
