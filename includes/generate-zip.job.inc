@@ -139,7 +139,7 @@ EOHT;
     $stats['size']['compressed'] = filesize($zip_file_path);
   };
 
-  $cleanup_tmp_zip = function() {
+  $cleanup_tmp_zip = function() use ($zip) {
 
     $zip->close();
 
