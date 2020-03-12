@@ -105,6 +105,51 @@ EOHT;
     }
   };
 
+  $tmp_files       = [];
+  $tmp_destination = $directory . '/tmp';
+  file_prepare_directory($tmp_destination, FILE_CREATE_DIRECTORY);
+
+  $write_file_to_tmp = function($actual_file, $actual_name) use ($tmp_files, $tmp_destination) {
+
+    $actual_path = drupal_realpath($actual_file);
+    copy($actual_path, $tmp_destination);
+
+    $tmp_files[] = [
+
+      'path' => $actual_path,
+      'name' => $actual_name,
+    ];
+  };
+
+  $write_tmp_to_zip = function() use ($tmp_files, $tmp_destination, $zip, $zip_file_path, $stats, $check_stats) {
+
+    $zip->open($zip_file_path, ZipArchive::CREATE);
+
+    foreach ($tmp_files as $tmp_file) {
+
+      $tmp_file_size = filesize($tmp_file['path']);
+      $check_stats($tmp_file_size);
+
+      $zip->addFile($tmp_file['path'], $tmp_file['name']);
+
+      $stats['count'] += 1;
+      $stats['size']['source'] += $tmp_file_size;
+    }
+
+    $stats['size']['compressed'] = filesize($zip_file_path);
+  };
+
+  $cleanup_tmp_zip = function() {
+
+    $zip->close();
+
+    foreach ($tmp_files as $tmp_file) {
+      drupal_unlink($tmp_file['path']);
+    }
+
+    drupal_rmdir($tmp_destination);
+  };
+
   $write_file_to_zip = function ($actual_file, $destination_name = NULL) use ($zip, $zip_file_path, &$stats, $check_stats) {
     $actual_path = drupal_realpath($actual_file);
     $actual_size = filesize($actual_path);
@@ -137,6 +182,22 @@ EOHT;
     }
     return $filename;
   };
+
+  $write_datastream_to_tmp = function(AbstractDatastream $datastream, $dir) use ($write_file_to_tmp, $datastream_filename) {
+
+    try {
+
+      $tempfile = drupal_tempnam('temporary://', 'islandora_zip_download');
+      $datastream->getContent($tempfile);
+
+      $filename = $datastream_filename($datastream);
+      $write_file_to_tmp($tempfile, $dir . '/' . $filename);
+
+    } finally {
+      drupal_unlink($tempfile);
+    }
+  };
+
   $write_datastream_to_zip = function (AbstractDatastream $datastream, $dir) use ($write_file_to_zip, $datastream_filename) {
     try {
       $tempfile = drupal_tempnam('temporary://', 'islandora_zip_download');
@@ -180,7 +241,8 @@ EOHT;
         }
 
         try {
-          $write_datastream_to_zip($datastream, $object_dir);
+          $write_datastream_to_tmp($datastream, $object_dir);
+          // $write_datastream_to_zip($datastream, $object_dir);
         }
         catch (IslandoraZipDownloadSourceLimitException $e) {
           throw $e;
@@ -199,10 +261,14 @@ EOHT;
         }
       }
     }
+
+    $write_tmp_to_zip();
   }
   catch (IslandoraZipDownloadSourceLimitException $e) {
     $size_constrained = TRUE;
     watchdog_exception('islandora_zip_download', $e, 'Hit size limit generating ZIP file. Generation parameters: @params', array('@params' => print_r($info, TRUE)), WATCHDOG_NOTICE);
+  } finally {
+    $cleanup_tmp_zip();
   }
 
   $array_to_string = function (array $input, $eol = "\n") {
@@ -441,6 +507,12 @@ class IslandoraZipDownloadZipIterator implements RecursiveIterator {
       $constituent_parents = array_map($map_results, $constituent_parents);
       $pid = array_unique($constituent_parents);
       }
+    }
+
+    try {
+      throw new \Exception('rtest');
+    } catch (\Exception $e) {
+      // file_put_contents('/app/flat/log/zip.log', file_get_contents('/app/flat/log/zip.log') . "\n\n" . var_export($e->getTraceAsString(), true));
     }
 
     $pid = array_slice($pid, 0, 1); // in case there are multiple parents we only need one for constructing a path
